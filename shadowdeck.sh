@@ -1,342 +1,221 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# ============================================================
+#  ShadowDeck v2 — Ultimate Purple Team Toolkit
+#  Author : 0xShadowpk
+#  Target : Kali WSL2 | HP EliteBook 840 G3
+#  Repo   : git@github.com:0xShadowpk/ShadowDeck.git
+# ============================================================
 
-# ============================================
-#   SHADOWDECK - KALI EDITION
-#   by shadowpk
-# ============================================
+# ── Paths ────────────────────────────────────────────────────
+SHADOWDECK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MODULES_DIR="$SHADOWDECK_DIR/modules"
+LOGS_DIR="$SHADOWDECK_DIR/logs"
+mkdir -p "$LOGS_DIR"
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-WHITE='\033[1;37m'
-NC='\033[0m'
+# ── CRT Color Palette ─────────────────────────────────────────
+RESET='\033[0m'
+GREEN='\033[38;5;82m'       # phosphor green — primary text
+GREEN_DIM='\033[38;5;22m'   # dim green — borders / inactive
+GREEN_HI='\033[38;5;118m'   # bright green — highlights / titles
+RED='\033[38;5;196m'        # alert / danger
+AMBER='\033[38;5;214m'      # warnings / blue-team accent
+CYAN='\033[38;5;51m'        # info / links
+BOLD='\033[1m'
+DIM='\033[2m'
+BLINK='\033[5m'
 
-banner() {
-    clear
-    echo -e "${CYAN}"
-    cat << 'EOF'
- ███████╗██╗  ██╗ █████╗ ██████╗  ██████╗ ██╗    ██╗██████╗ ██╗  ██╗
- ██╔════╝██║  ██║██╔══██╗██╔══██╗██╔═══██╗██║    ██║██╔══██╗██║ ██╔╝
- ███████╗███████║███████║██║  ██║██║   ██║██║ █╗ ██║██████╔╝█████╔╝ 
- ╚════██║██╔══██║██╔══██║██║  ██║██║   ██║██║███╗██║██╔═══╝ ██╔═██╗ 
- ███████║██║  ██║██║  ██║██████╔╝╚██████╔╝╚███╔███╔╝██║     ██║  ██╗
- ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝  ╚══╝╚══╝ ╚═╝     ╚═╝  ╚═╝
-EOF
-    echo -e "${NC}"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e " ${YELLOW}User:${NC} shadowpk   ${YELLOW}Host:${NC} kali-nethunter   ${YELLOW}Mode:${NC} ${RED}KALI EDITION${NC}"
-    echo -e " ${YELLOW}Time:${NC} $(date '+%d %b %Y | %H:%M:%S')"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+# ── Helpers ───────────────────────────────────────────────────
+crt_clear() { clear; printf '\033[?25l'; }   # hide cursor on clear
+crt_show_cursor() { printf '\033[?25h'; }
+trap crt_show_cursor EXIT
+
+dim_line()  { echo -e "${GREEN_DIM}$(printf '─%.0s' {1..70})${RESET}"; }
+thick_line(){ echo -e "${GREEN}$(printf '═%.0s' {1..70})${RESET}"; }
+
+log_action() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOGS_DIR/shadowdeck.log"
 }
 
-pause() {
+require_module() {
+    local mod="$MODULES_DIR/$1"
+    if [[ ! -f "$mod" ]]; then
+        echo -e "${RED}[!] Module not found: $1${RESET}"
+        echo -e "${AMBER}[*] Run: git pull to update ShadowDeck${RESET}"
+        sleep 2; return 1
+    fi
+    bash "$mod"
+}
+
+confirm() {
+    echo -e "${AMBER}[?] $1 [y/N]: ${RESET}"
+    read -r ans
+    [[ "$ans" =~ ^[Yy]$ ]]
+}
+
+# ── ASCII Banner ──────────────────────────────────────────────
+print_banner() {
+    echo -e "${GREEN_HI}${BOLD}"
+    cat << 'BANNER'
+  ██████╗ ██╗  ██╗ █████╗ ██████╗  ██████╗ ██╗    ██╗
+  ██╔════╝██║  ██║██╔══██╗██╔══██╗██╔═══██╗██║    ██║
+  ███████╗███████║███████║██║  ██║██║   ██║██║ █╗ ██║
+  ╚════██║██╔══██║██╔══██║██║  ██║██║   ██║██║███╗██║
+  ███████║██║  ██║██║  ██║██████╔╝╚██████╔╝╚███╔███╔╝
+  ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝  ╚══╝╚══╝
+BANNER
+    echo -e "${RESET}"
+    echo -e "${GREEN}          ██████╗ ███████╗ ██████╗██╗  ██╗    ██╗   ██╗██████╗ ${RESET}"
+    echo -e "${GREEN}          ██╔══██╗██╔════╝██╔════╝██║ ██╔╝    ██║   ██║╚════██╗${RESET}"
+    echo -e "${GREEN_HI}          ██║  ██║█████╗  ██║     █████╔╝     ██║   ██║ █████╔╝${RESET}"
+    echo -e "${GREEN}          ██║  ██║██╔══╝  ██║     ██╔═██╗     ╚██╗ ██╔╝██╔═══╝ ${RESET}"
+    echo -e "${GREEN_DIM}          ██████╔╝███████╗╚██████╗██║  ██╗     ╚████╔╝ ███████╗${RESET}"
+    echo -e "${GREEN_DIM}          ╚═════╝ ╚══════╝ ╚═════╝╚═╝  ╚═╝      ╚═══╝  ╚══════╝${RESET}"
+}
+
+# ── Status Bar ────────────────────────────────────────────────
+print_statusbar() {
+    local ip_local vpn_status
+    ip_local=$(hostname -I 2>/dev/null | awk '{print $1}')
+    if ip a 2>/dev/null | grep -q "tun0"; then
+        vpn_status="${GREEN}[VPN:ON]${RESET}"
+    else
+        vpn_status="${RED}[VPN:OFF]${RESET}"
+    fi
+
+    thick_line
+    echo -e " ${GREEN_DIM}USER${RESET}: ${GREEN}${BOLD}$(whoami)${RESET}  ${GREEN_DIM}HOST${RESET}: ${GREEN}$(hostname)${RESET}  ${GREEN_DIM}IP${RESET}: ${GREEN}${ip_local}${RESET}  ${vpn_status}  ${GREEN_DIM}$(date '+%H:%M %Z')${RESET}"
+    thick_line
+}
+
+# ── Main Menu ─────────────────────────────────────────────────
+print_menu() {
     echo ""
-    echo -e "${YELLOW}[Press ENTER to return to menu]${NC}"
-    read
-}
-
-# ─── TOOLS ───────────────────────────────────────────
-
-nmap_scan() {
-    echo -e "${CYAN}[ NMAP SCAN ]${NC}"
-    echo -e "1) Quick Scan (top ports)"
-    echo -e "2) Full Port Scan"
-    echo -e "3) Service/Version Detection"
-    echo -e "4) OS Detection (requires root)"
-    read -p "Choose: " ns
-    read -p "Target (IP or domain): " target
-    case $ns in
-        1) nmap -sT --top-ports 100 $target ;;
-        2) nmap -sT -p- $target ;;
-        3) nmap -sT -sV $target ;;
-        4) sudo nmap -sT -O $target ;;
-        *) echo "Invalid" ;;
-    esac
-    pause
-}
-
-whois_lookup() {
-    echo -e "${CYAN}[ WHOIS LOOKUP ]${NC}"
-    read -p "Domain or IP: " target
-    whois $target
-    pause
-}
-
-ping_test() {
-    echo -e "${CYAN}[ PING TEST ]${NC}"
-    read -p "Target: " target
-    read -p "Count [default 4]: " count
-    count=${count:-4}
-    ping -c $count $target
-    pause
-}
-
-traceroute_tool() {
-    echo -e "${CYAN}[ TRACEROUTE ]${NC}"
-    read -p "Target: " target
-    traceroute $target
-    pause
-}
-
-ip_info() {
-    echo -e "${CYAN}[ IP INFO ]${NC}"
-    read -p "IP address: " ip
-    curl -s "https://ipinfo.io/$ip" | python3 -m json.tool 2>/dev/null || curl -s "https://ipinfo.io/$ip"
-    pause
-}
-
-password_check() {
-    echo -e "${CYAN}[ PASSWORD STRENGTH CHECK ]${NC}"
-    read -p "Enter password: " -s pass
+    echo -e "${GREEN_HI}${BOLD}  ╔══ RED TEAM ══════════════╗   ╔══ BLUE TEAM ═════════════╗${RESET}"
+    echo -e "${GREEN}  ║  ${RED}[1]${GREEN} Recon              ║   ║  ${AMBER}[5]${GREEN} Forensics           ║${RESET}"
+    echo -e "${GREEN}  ║  ${RED}[2]${GREEN} Brute Force        ║   ║  ${AMBER}[6]${GREEN} Hash Cracking       ║${RESET}"
+    echo -e "${GREEN}  ║  ${RED}[3]${GREEN} Web Attacks        ║   ║  ${AMBER}[7]${GREEN} Traffic Analysis    ║${RESET}"
+    echo -e "${GREEN}  ║  ${RED}[4]${GREEN} Reverse Shells     ║   ║  ${AMBER}[8]${GREEN} Log Analyzer        ║${RESET}"
+    echo -e "${GREEN}  ╚════════════════════════╝   ╚═════════════════════════╝${RESET}"
     echo ""
-    len=${#pass}
-    score=0
-    [[ $len -ge 8 ]] && score=$((score+1))
-    [[ $len -ge 12 ]] && score=$((score+1))
-    [[ "$pass" =~ [A-Z] ]] && score=$((score+1))
-    [[ "$pass" =~ [a-z] ]] && score=$((score+1))
-    [[ "$pass" =~ [0-9] ]] && score=$((score+1))
-    [[ "$pass" =~ [\!\@\#\$\%\^\&\*] ]] && score=$((score+1))
-    echo -e "Length: $len characters"
-    if [ $score -le 2 ]; then
-        echo -e "${RED}Strength: WEAK${NC}"
-    elif [ $score -le 4 ]; then
-        echo -e "${YELLOW}Strength: MODERATE${NC}"
+    echo -e "${GREEN_HI}${BOLD}  ╔══ CORE ═══════════════════════════════════════════════════╗${RESET}"
+    echo -e "${GREEN}  ║  ${CYAN}[9]${GREEN} ShadowScan (WebUI)    ${CYAN}[10]${GREEN} tmux Workspace        ║${RESET}"
+    echo -e "${GREEN}  ║  ${CYAN}[11]${GREEN} GitHub Push           ${CYAN}[12]${GREEN} Cheatsheet/Help       ║${RESET}"
+    echo -e "${GREEN}  ╚═══════════════════════════════════════════════════════════╝${RESET}"
+    echo ""
+    dim_line
+    echo -e "  ${GREEN_DIM}[0] Exit${RESET}                                        ${DIM}ShadowDeck v2.0${RESET}"
+    dim_line
+    echo ""
+    echo -ne "  ${GREEN_HI}${BOLD}shadow@deck${RESET}${GREEN} > ${RESET}"
+}
+
+# ── Module Dispatchers ────────────────────────────────────────
+run_recon()         { log_action "Recon module launched";        require_module "red/recon.sh"; }
+run_bruteforce()    { log_action "BruteForce module launched";   require_module "red/bruteforce.sh"; }
+run_webattacks()    { log_action "WebAttacks module launched";   require_module "red/webattacks.sh"; }
+run_revshells()     { log_action "RevShells module launched";    require_module "red/revshells.sh"; }
+run_forensics()     { log_action "Forensics module launched";    require_module "blue/forensics.sh"; }
+run_hashcrack()     { log_action "HashCrack module launched";    require_module "blue/hashcrack.sh"; }
+run_traffic()       { log_action "Traffic module launched";      require_module "blue/traffic.sh"; }
+run_loganalyzer()   { log_action "LogAnalyzer module launched";  require_module "blue/loganalyzer.sh"; }
+
+run_shadowscan() {
+    log_action "ShadowScan launched"
+    echo -e "\n${GREEN}[*] Starting ShadowScan...${RESET}"
+    # Try to open in background; works if ShadowScan is already cloned alongside
+    local scan_dir
+    scan_dir=$(find "$HOME" -maxdepth 3 -name "app.py" -path "*/ShadowScan/*" 2>/dev/null | head -1 | xargs dirname 2>/dev/null)
+    if [[ -n "$scan_dir" ]]; then
+        echo -e "${GREEN}[+] Found ShadowScan at: $scan_dir${RESET}"
+        cd "$scan_dir" || return
+        nohup python3 app.py &>/dev/null &
+        sleep 1
+        echo -e "${GREEN}[+] ShadowScan running at ${CYAN}http://127.0.0.1:5000${RESET}"
+        echo -e "${GREEN_DIM}    Open in browser: http://127.0.0.1:5000${RESET}"
     else
-        echo -e "${GREEN}Strength: STRONG${NC}"
+        echo -e "${AMBER}[!] ShadowScan not found. Clone it alongside ShadowDeck:${RESET}"
+        echo -e "${CYAN}    git clone git@github.com:0xShadowpk/ShadowScan.git${RESET}"
     fi
-    pause
+    echo -e "\n${GREEN_DIM}Press Enter to return...${RESET}"; read -r
 }
 
-dns_lookup() {
-    echo -e "${CYAN}[ DNS LOOKUP ]${NC}"
-    read -p "Domain: " domain
-    echo -e "\n${YELLOW}A Records:${NC}"
-    dig +short A $domain
-    echo -e "\n${YELLOW}MX Records:${NC}"
-    dig +short MX $domain
-    echo -e "\n${YELLOW}NS Records:${NC}"
-    dig +short NS $domain
-    echo -e "\n${YELLOW}TXT Records:${NC}"
-    dig +short TXT $domain
-    pause
-}
-
-open_ports() {
-    echo -e "${CYAN}[ SHOW OPEN PORTS - LOCAL ]${NC}"
-    ss -tulnp 2>/dev/null || netstat -tulnp
-    pause
-}
-
-public_ip() {
-    echo -e "${CYAN}[ MY PUBLIC IP ]${NC}"
-    echo -e "Public IP: ${GREEN}$(curl -s ifconfig.me)${NC}"
-    echo -e "Alt check:  ${GREEN}$(curl -s icanhazip.com)${NC}"
-    pause
-}
-
-system_monitor() {
-    echo -e "${CYAN}[ SYSTEM MONITOR ]${NC}"
-    echo -e "\n${YELLOW}── CPU & Memory ──${NC}"
-    free -h
-    echo -e "\n${YELLOW}── Disk Usage ──${NC}"
-    df -h /
-    echo -e "\n${YELLOW}── Top Processes ──${NC}"
-    top -bn1 | head -20
-    pause
-}
-
-nikto_scan() {
-    echo -e "${CYAN}[ NIKTO WEB SCANNER ]${NC}"
-    read -p "Target URL (e.g. http://example.com): " target
-    if command -v nikto &>/dev/null; then
-        nikto -h $target
-    else
-        echo -e "${RED}Nikto not installed. Run: sudo apt install nikto${NC}"
+run_tmux_workspace() {
+    log_action "tmux workspace launched"
+    local session="ShadowDeck"
+    if tmux has-session -t "$session" 2>/dev/null; then
+        echo -e "${AMBER}[*] Session '$session' already running. Attaching...${RESET}"
+        sleep 1
+        tmux attach-session -t "$session"
+        return
     fi
-    pause
+    echo -e "${GREEN}[*] Launching tmux workspace...${RESET}"
+    tmux new-session  -d -s "$session" -n "Dashboard" -x 220 -y 50
+    tmux new-window   -t "$session"    -n "ShadowScan"
+    tmux new-window   -t "$session"    -n "NetHunter"
+    tmux new-window   -t "$session"    -n "Git"
+    tmux new-window   -t "$session"    -n "ShadowDeck"
+    tmux send-keys    -t "$session:ShadowScan"  "cd ~/ShadowScan && python3 app.py" ""
+    tmux send-keys    -t "$session:Dashboard"   "bash $SHADOWDECK_DIR/shadowdeck.sh" ""
+    tmux select-window -t "$session:Dashboard"
+    tmux attach-session -t "$session"
 }
 
-gobuster_scan() {
-    echo -e "${CYAN}[ GOBUSTER - DIRECTORY BRUTE FORCE ]${NC}"
-    read -p "Target URL: " target
-    read -p "Wordlist path [default: /usr/share/wordlists/dirb/common.txt]: " wlist
-    wlist=${wlist:-/usr/share/wordlists/dirb/common.txt}
-    if command -v gobuster &>/dev/null; then
-        gobuster dir -u $target -w $wlist
-    else
-        echo -e "${RED}Gobuster not installed. Run: sudo apt install gobuster${NC}"
-    fi
-    pause
+run_github_push() {
+    log_action "GitHub push initiated"
+    echo -e "\n${GREEN}[*] GitHub Push — ShadowDeck${RESET}"
+    dim_line
+    cd "$SHADOWDECK_DIR" || { echo -e "${RED}[!] Cannot cd to ShadowDeck dir${RESET}"; return; }
+    echo -e "${GREEN_DIM}Staged changes:${RESET}"
+    git status --short
+    echo ""
+    echo -ne "${GREEN}[?] Commit message: ${RESET}"
+    read -r commit_msg
+    [[ -z "$commit_msg" ]] && commit_msg="chore: update ShadowDeck v2"
+    git add -A
+    git commit -m "$commit_msg"
+    git push origin main
+    echo -e "\n${GREEN}[+] Pushed to git@github.com:0xShadowpk/ShadowDeck.git${RESET}"
+    echo -e "${GREEN_DIM}Press Enter to return...${RESET}"; read -r
 }
 
-hydra_brute() {
-    echo -e "${CYAN}[ HYDRA - LOGIN BRUTE FORCE ]${NC}"
-    echo -e "${RED}[!] Only use on systems you own or have permission to test!${NC}"
-    read -p "Target IP: " target
-    read -p "Service (ssh/ftp/http-post-form): " service
-    read -p "Username: " user
-    read -p "Wordlist path: " wlist
-    if command -v hydra &>/dev/null; then
-        hydra -l $user -P $wlist $target $service
-    else
-        echo -e "${RED}Hydra not installed. Run: sudo apt install hydra${NC}"
-    fi
-    pause
+run_cheatsheet() {
+    require_module "core/cheatsheet.sh"
 }
 
-arp_scan() {
-    echo -e "${CYAN}[ ARP SCAN - LOCAL NETWORK ]${NC}"
-    read -p "Network range (e.g. 192.168.1.0/24): " range
-    if command -v arp-scan &>/dev/null; then
-        sudo arp-scan $range
-    else
-        echo -e "${YELLOW}arp-scan not found. Trying nmap...${NC}"
-        nmap -sn $range
-    fi
-    pause
-}
-
-hash_id() {
-    echo -e "${CYAN}[ HASH IDENTIFIER ]${NC}"
-    read -p "Enter hash: " hash
-    len=${#hash}
-    echo -e "\nHash length: $len characters"
-    case $len in
-        32)  echo -e "Possible: ${GREEN}MD5${NC}" ;;
-        40)  echo -e "Possible: ${GREEN}SHA1${NC}" ;;
-        56)  echo -e "Possible: ${GREEN}SHA224${NC}" ;;
-        64)  echo -e "Possible: ${GREEN}SHA256${NC}" ;;
-        96)  echo -e "Possible: ${GREEN}SHA384${NC}" ;;
-        128) echo -e "Possible: ${GREEN}SHA512${NC}" ;;
-        *)   echo -e "Possible: ${YELLOW}Unknown / NTLM / bcrypt${NC}" ;;
-    esac
-    if command -v hash-identifier &>/dev/null; then
-        echo $hash | hash-identifier
-    fi
-    pause
-}
-
-ssl_check() {
-    echo -e "${CYAN}[ SSL CERTIFICATE CHECKER ]${NC}"
-    read -p "Domain (without https://): " domain
-    echo | openssl s_client -connect $domain:443 -servername $domain 2>/dev/null | openssl x509 -noout -dates -subject -issuer
-    pause
-}
-
-subdomain_finder() {
-    echo -e "${CYAN}[ SUBDOMAIN FINDER ]${NC}"
-    read -p "Domain: " domain
-    echo -e "${YELLOW}Common subdomains check:${NC}"
-    for sub in www mail ftp admin dev api vpn smtp pop3 test staging; do
-        result=$(host $sub.$domain 2>/dev/null | grep "has address")
-        if [ ! -z "$result" ]; then
-            echo -e "${GREEN}[+] $sub.$domain${NC} → $result"
-        fi
-    done
-    echo -e "\n${YELLOW}For deep scan install: sudo apt install subfinder${NC}"
-    pause
-}
-
-netcat_listener() {
-    echo -e "${CYAN}[ NETCAT LISTENER ]${NC}"
-    read -p "Port to listen on: " port
-    echo -e "${YELLOW}Listening on port $port... (CTRL+C to stop)${NC}"
-    nc -lvnp $port
-    pause
-}
-
-packet_capture() {
-    echo -e "${CYAN}[ PACKET CAPTURE - tcpdump ]${NC}"
-    echo -e "${YELLOW}Available interfaces:${NC}"
-    ip link show | grep '^[0-9]' | awk '{print $2}' | tr -d ':'
-    read -p "Interface: " iface
-    read -p "Packet count [default 20]: " count
-    count=${count:-20}
-    sudo tcpdump -i $iface -c $count
-    pause
-}
-
-msf_launch() {
-    echo -e "${CYAN}[ METASPLOIT FRAMEWORK ]${NC}"
-    if command -v msfconsole &>/dev/null; then
-        msfconsole
-    else
-        echo -e "${RED}Metasploit not installed.${NC}"
-        echo -e "Install with: ${YELLOW}sudo apt install metasploit-framework${NC}"
-    fi
-    pause
-}
-
-# ─── MAIN MENU ───────────────────────────────────────
-
-main_menu() {
+# ── Main Loop ─────────────────────────────────────────────────
+main() {
     while true; do
-        banner
-        echo -e "${WHITE}  ╔══════════════════════════════╗${NC}"
-        echo -e "${WHITE}  ║       [ TOOL MENU ]          ║${NC}"
-        echo -e "${WHITE}  ╚══════════════════════════════╝${NC}"
-        echo ""
-        echo -e "${GREEN}  ── NETWORK ──${NC}"
-        echo -e "  ${CYAN}1)${NC}  Nmap Scan"
-        echo -e "  ${CYAN}2)${NC}  Whois Lookup"
-        echo -e "  ${CYAN}3)${NC}  Ping Test"
-        echo -e "  ${CYAN}4)${NC}  Traceroute"
-        echo -e "  ${CYAN}5)${NC}  IP Info"
-        echo -e "  ${CYAN}6)${NC}  DNS Lookup"
-        echo -e "  ${CYAN}7)${NC}  Show Open Ports"
-        echo -e "  ${CYAN}8)${NC}  My Public IP"
-        echo -e "  ${CYAN}9)${NC}  ARP Scan (LAN)"
-        echo -e "  ${CYAN}10)${NC} Subdomain Finder"
-        echo -e "  ${CYAN}11)${NC} SSL Certificate Check"
-        echo ""
-        echo -e "${RED}  ── PENTESTING ──${NC}"
-        echo -e "  ${CYAN}12)${NC} Nikto Web Scanner"
-        echo -e "  ${CYAN}13)${NC} Gobuster Dir Scan"
-        echo -e "  ${CYAN}14)${NC} Hydra Brute Force"
-        echo -e "  ${CYAN}15)${NC} Netcat Listener"
-        echo -e "  ${CYAN}16)${NC} Packet Capture"
-        echo -e "  ${CYAN}17)${NC} Metasploit Launch"
-        echo ""
-        echo -e "${YELLOW}  ── UTILS ──${NC}"
-        echo -e "  ${CYAN}18)${NC} Password Strength Check"
-        echo -e "  ${CYAN}19)${NC} Hash Identifier"
-        echo -e "  ${CYAN}20)${NC} System Monitor"
-        echo ""
-        echo -e "  ${RED}0)${NC}  Exit"
-        echo ""
-        echo -ne "${GREEN}shadowpk@kali ${CYAN}➜ ${NC}Choose option: "
-        read choice
+        crt_clear
+        print_banner
+        print_statusbar
+        print_menu
 
-        case $choice in
-            1)  nmap_scan ;;
-            2)  whois_lookup ;;
-            3)  ping_test ;;
-            4)  traceroute_tool ;;
-            5)  ip_info ;;
-            6)  dns_lookup ;;
-            7)  open_ports ;;
-            8)  public_ip ;;
-            9)  arp_scan ;;
-            10) subdomain_finder ;;
-            11) ssl_check ;;
-            12) nikto_scan ;;
-            13) gobuster_scan ;;
-            14) hydra_brute ;;
-            15) netcat_listener ;;
-            16) packet_capture ;;
-            17) msf_launch ;;
-            18) password_check ;;
-            19) hash_id ;;
-            20) system_monitor ;;
-            0)  echo -e "${RED}Exiting ShadowDeck...${NC}"; exit 0 ;;
-            *)  echo -e "${RED}Invalid option${NC}"; sleep 1 ;;
+        read -r choice
+        case "$choice" in
+            1)  run_recon ;;
+            2)  run_bruteforce ;;
+            3)  run_webattacks ;;
+            4)  run_revshells ;;
+            5)  run_forensics ;;
+            6)  run_hashcrack ;;
+            7)  run_traffic ;;
+            8)  run_loganalyzer ;;
+            9)  run_shadowscan ;;
+            10) run_tmux_workspace ;;
+            11) run_github_push ;;
+            12) run_cheatsheet ;;
+            0)
+                crt_clear
+                echo -e "\n${GREEN_HI}${BOLD}  [ShadowDeck] Session terminated. Stay in the shadows. 🕶${RESET}\n"
+                crt_show_cursor
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}[!] Invalid option${RESET}"
+                sleep 0.8
+                ;;
         esac
     done
 }
 
-
-main_menu
+main
